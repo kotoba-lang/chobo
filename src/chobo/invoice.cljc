@@ -180,3 +180,52 @@
   (overdue-invoices [s now] (filterv #(dunning? % now) (vals @state))))
 
 (defn mock-invoice-store [] (->MockInvoiceStore (atom {})))
+
+;; ---------------------------------------------------------------------------
+;; dunning escalation tiers (reminder → urgent → final → collection)
+;; ---------------------------------------------------------------------------
+
+(def dunning-tiers
+  "Ordered escalation tiers for overdue invoices. Each tier has a label and
+  a days-overdue threshold (how many days past the due-date)."
+  [{:tier :reminder   :days-overdue 1   :label "Payment reminder"}
+   {:tier :urgent     :days-overdue 7   :label "Urgent: payment overdue"}
+   {:tier :final      :days-overdue 30  :label "Final notice before collection"}
+   {:tier :collection :days-overdue 60  :label "Sent to collections"}])
+
+(defn days-overdue
+  "Compute how many days an invoice is past due. v1 stub: compares ISO date
+  strings lexicographically and returns a rough day count based on string
+  difference (not calendar-accurate; host app supplies real day count). Returns
+  0 if not overdue or no due-at."
+  [inv now]
+  (if (dunning? inv now)
+    ;; rough: difference in the day-of-month portion (v1 stub)
+    (let [due (subs (str (:due-at inv)) 8 10)
+          now-day (subs (str now) 8 10)]
+      (try
+        (max 0 (- (Integer/parseInt now-day) (Integer/parseInt due)))
+        (catch Exception _ 1)))
+    0))
+
+(defn dunning-tier
+  "Determine the dunning tier for an invoice given `now`. Returns the tier map
+  (the highest whose days-overdue threshold is met), or nil if not overdue."
+  [inv now]
+  (when (dunning? inv now)
+    (let [dd (days-overdue inv now)]
+      (some (fn [tier]
+              (when (>= dd (:days-overdue tier)) tier))
+            (reverse dunning-tiers)))))
+
+(defn dunning-tier-activity
+  "Build a ledger activity for a dunning escalation (kind :dunning-escalation)."
+  [inv tier opts]
+  (ledger/activity
+   (merge {:lane :billing :kind :dunning-escalation
+           :title (:label tier "dunning")
+           :tenant (:tenant inv)
+           :props {:invoice-id (:id inv)
+                   :tier (:tier tier)
+                   :days-overdue (:days-overdue tier)}}
+          opts)))
