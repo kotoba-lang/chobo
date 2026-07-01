@@ -41,6 +41,44 @@
         amt (reduce + 0 (map :amount (:lines inv)))]
     {:amount amt :currency cur}))
 
+(defn line-with-tax
+  "Given a Line and a tax rate (0.08 = 8%), return the line with :tax and
+  :total-with-tax computed. :tax = round(amount * rate); :total-with-tax =
+  amount + tax."
+  [line rate]
+  (let [amt (:amount line 0)
+        tax (long (* amt rate))]
+    (assoc line :tax tax :total-with-tax (+ amt tax))))
+
+(defn apply-tax
+  "Apply a tax rate to all lines, returning an invoice with :lines updated
+  (each line gets :tax/:total-with-tax) and :tax-summary set."
+  [inv rate]
+  (let [lines-with-tax (mapv #(line-with-tax % rate) (:lines inv))
+        subtotal (reduce + 0 (map :amount lines-with-tax))
+        tax-total (reduce + 0 (map :tax lines-with-tax))
+        grand-total (+ subtotal tax-total)
+        cur (get-in inv [:lines 0 :currency] "JPY")]
+    (assoc inv
+           :lines lines-with-tax
+           :tax-summary {:subtotal subtotal
+                         :tax tax-total
+                         :total grand-total
+                         :currency cur
+                         :rate rate})))
+
+(defn tax-summary
+  "Get the :tax-summary map (computed by apply-tax), or fall back to plain
+  totals if no tax was applied."
+  [inv]
+  (or (:tax-summary inv)
+      (let [t (totals inv)]
+        {:subtotal (:amount t 0)
+         :tax 0
+         :total (:amount t 0)
+         :currency (:currency t "JPY")
+         :rate 0})))
+
 (defn can-transition? [from to] (contains? (get transitions from #{}) to))
 
 (defn transition [inv to]
