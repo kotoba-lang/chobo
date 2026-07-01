@@ -98,8 +98,54 @@
        (pos? (compare (str now) (str (:due-at inv))))))
 
 ;; ---------------------------------------------------------------------------
-;; invoice → ledger projection (billing activity)
+;; partial payments + credit balance
 ;; ---------------------------------------------------------------------------
+
+(defrecord Payment [id amount currency at method ref])
+
+(defn payment [m] (merge {:currency "JPY"} m))
+
+(defn outstanding
+  "Remaining amount on an invoice: total - sum(paid payments). Returns a Price.
+  Uses :tax-summary total if present, else plain totals."
+  [inv]
+  (let [summary (tax-summary inv)
+        total-amt (:amount (or (:total summary) summary) (:total summary 0))
+        cur (:currency summary "JPY")
+        paid-amt (reduce + 0 (map :amount (:payments inv [])))]
+    {:amount (max 0 (- total-amt paid-amt)) :currency cur}))
+
+(defn amount-paid
+  "Sum of all payment amounts on the invoice."
+  [inv]
+  (reduce + 0 (map :amount (:payments inv []))))
+
+(defn fully-paid?
+  "True if payments cover the invoice total."
+  [inv]
+  (<= (:amount (outstanding inv) 0) 0))
+
+(defn apply-payment
+  "Record a partial (or full) payment on an invoice. If it fully covers the
+  total, mark the invoice :paid. Returns the updated invoice."
+  [inv pmt]
+  (let [p (payment pmt)
+        inv' (update inv :payments (fnil conj []) p)]
+    (if (fully-paid? inv')
+      (or (mark-paid inv') inv')                ; mark-paid returns nil if not :issued
+      inv')))
+
+(defn credit-balance
+  "Compute a tenant's credit balance: total overpayments across invoices
+  (payments exceeding invoice totals). v1: sums max(0, paid - total) per invoice."
+  [invoices]
+  (reduce + 0
+          (map (fn [inv]
+                 (let [summary (tax-summary inv)
+                       total (:amount (or (:total summary) summary) (:total summary 0))
+                       paid (amount-paid inv)]
+                   (max 0 (- paid total))))
+               invoices)))
 
 (defn billing-activity
   "Build a ledger activity for an invoice (lane :billing, kind :invoice). Caller
