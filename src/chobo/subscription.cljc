@@ -86,3 +86,57 @@
    (merge {:lane :billing :kind :metering :title (str "meter " key)
            :tenant tenant :source :subscription
            :props {:key key :amount amount}} opts)))
+
+;; ---------------------------------------------------------------------------
+;; subscription lifecycle (activate / suspend / cancel / reactivate)
+;; ---------------------------------------------------------------------------
+
+(defrecord Subscription [id tenant plan-id status started-at suspended-at cancelled-at])
+
+(def sub-statuses #{:pending :active :suspended :cancelled})
+(def sub-transitions
+  {:pending   #{:active :cancelled}
+   :active    #{:suspended :cancelled}
+   :suspended #{:active :cancelled}
+   :cancelled #{}})
+
+(defn subscription [m] (merge {:status :pending} m))
+
+(defn sub-can-transition? [from to] (contains? (get sub-transitions from #{}) to))
+
+(defn activate-sub [s]
+  (when (sub-can-transition? (:status s :pending) :active)
+    (assoc s :status :active)))
+
+(defn suspend-sub [s]
+  (when (sub-can-transition? (:status s :active) :suspended)
+    (assoc s :status :suspended)))
+
+(defn cancel-sub [s]
+  (when (sub-can-transition? (:status s :pending) :cancelled)
+    (assoc s :status :cancelled)))
+
+(defn reactivate-sub [s]
+  (when (= (:status s) :suspended)
+    (assoc s :status :active)))
+
+(defn sub-active? [s] (= (:status s :pending) :active))
+
+;; ---------------------------------------------------------------------------
+;; metering window reset (billing cycle rollover)
+;; ---------------------------------------------------------------------------
+
+(defn reset-usage
+  "Zero out all consumed quantities for a new billing cycle. Returns a new
+  Usage with the same tenant but empty :consumed. The host app calls this at
+  the plan's billing-cycle boundary (monthly etc.)."
+  [usage]
+  (assoc usage :consumed {}))
+
+(defn rollover-activity
+  "Build a ledger activity for a billing-cycle rollover (metering reset)."
+  [tenant opts]
+  (ledger/activity
+   (merge {:lane :billing :kind :rollover
+           :title (str "metering reset for " tenant)
+           :tenant tenant :source :subscription} opts)))
