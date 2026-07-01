@@ -140,3 +140,55 @@
    (merge {:lane :billing :kind :rollover
            :title (str "metering reset for " tenant)
            :tenant tenant :source :subscription} opts)))
+
+;; ---------------------------------------------------------------------------
+;; prorated refund on cancellation
+;; ---------------------------------------------------------------------------
+
+(defn prorated-refund
+  "Compute the prorated refund for cancelling a subscription mid-cycle.
+  Returns a Price-like map {:amount :currency}. Arguments:
+    plan        — the Plan (must have :price :currency)
+    cycle-days  — total billing cycle length in days (default 30)
+    used-days   — days elapsed in the current cycle (default 0 = full refund)
+  Refund = price × (remaining-days / cycle-days). Returns {:amount 0} if
+  cycle-days is 0 or used-days ≥ cycle-days."
+  ([plan used-days]
+   (prorated-refund plan 30 used-days (:currency plan "JPY")))
+  ([plan cycle-days used-days currency]
+   (prorated-refund plan cycle-days used-days currency nil))
+  ([plan cycle-days used-days currency opts]
+   (let [price (:price plan 0)
+         remaining (max 0 (- (or cycle-days 30) (or used-days 0)))
+         cycle (max 1 (or cycle-days 30))      ; avoid div-by-zero
+         refund (* price (/ remaining cycle))]
+     {:amount (long refund)
+      :currency (or currency "JPY")
+      :remaining-days remaining
+      :cycle-days cycle
+      :used-days (or used-days 0)})))
+
+(defn prorated-cancel
+  "Cancel a subscription and compute the prorated refund. Returns
+  {:subscription s :refund refund-map} or {:error :not-cancellable} if the
+  subscription can't be cancelled from its current state."
+  ([sub plan used-days]
+   (prorated-cancel sub plan 30 used-days))
+  ([sub plan cycle-days used-days]
+   (if-let [cancelled (cancel-sub sub)]
+     {:subscription cancelled
+      :refund (prorated-refund plan cycle-days used-days (:currency plan "JPY"))}
+     {:error :not-cancellable})))
+
+(defn refund-activity
+  "Build a ledger activity for a prorated refund (lane :billing, kind :refund)."
+  [refund-map tenant opts]
+  (ledger/activity
+   (merge {:lane :billing :kind :refund
+           :title (str "Prorated refund for " tenant)
+           :tenant tenant :source :subscription
+           :props {:amount (:amount refund-map 0)
+                   :currency (:currency refund-map "JPY")
+                   :remaining-days (:remaining-days refund-map 0)
+                   :used-days (:used-days refund-map 0)}}
+          opts)))
