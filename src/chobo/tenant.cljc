@@ -7,7 +7,8 @@
   Operator trust levels (from cloud-itonami open-business):
   :contributor → :self-host → :certified → :managed → :core."
 
-  (:refer-clojure :exclude [tenant]))
+  (:refer-clojure :exclude [tenant])
+  (:require [clojure.set :as set]))
 
 (def operator-levels
   [:contributor :self-host :certified :managed :core])
@@ -41,3 +42,56 @@
   (let [tr (operator-level-rank (:operator-level t :contributor))
         tgt (operator-level-rank target)]
     (and (>= tr 0) (>= tgt 0) (>= tr tgt))))
+
+;; ---------------------------------------------------------------------------
+;; roles + capability inheritance
+;; ---------------------------------------------------------------------------
+
+(def role-capabilities
+  "Role → capability set. Higher roles inherit lower roles' capabilities.
+  :viewer < :member < :admin < :owner."
+  {:viewer  #{:read}
+   :member  #{:read :write}
+   :admin   #{:read :write :admin}
+   :owner   #{:read :write :admin :owner}})
+
+(def role-rank
+  "Role → rank (for inheritance checks)."
+  {:viewer 0 :member 1 :admin 2 :owner 3})
+
+(defn role-rank-of [role] (get role-rank role -1))
+
+(defn role-inherits?
+  "True if `role` inherits all capabilities of `target-role` (rank >=)."
+  [role target-role]
+  (>= (role-rank-of role) (role-rank-of target-role)))
+
+(defn capabilities-for-role
+  "The full capability set for a role (all capabilities of roles with rank ≤ it)."
+  [role]
+  (let [rank (role-rank-of role)]
+    (if (neg? rank)
+      #{}
+      (reduce (fn [acc [r caps]]
+                (if (<= (role-rank-of r) rank)
+                  (set/union acc caps)
+                  acc))
+              #{} role-capabilities))))
+
+(defn tenant-with-role
+  "Build a tenant with capabilities derived from a role (inheritance applied)."
+  [id role opts]
+  (let [role-caps (capabilities-for-role role)
+        extra (set (:capabilities opts))
+        all-caps (set/union role-caps extra)]
+    (tenant id (merge (dissoc opts :capabilities) {:capabilities all-caps}))))
+
+(defn effective-capabilities
+  "Resolve a tenant's effective capabilities: explicit caps + inherited from any
+  role in :roles (a set of roles)."
+  [t]
+  (let [explicit (:capabilities t #{})
+        roles (:roles t #{})
+        inherited (reduce (fn [acc r] (set/union acc (capabilities-for-role r)))
+                          #{} roles)]
+    (set/union explicit inherited)))
