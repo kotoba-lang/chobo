@@ -39,3 +39,5 @@ jobs:
             ${{ runner.os }}-jdk${{ matrix.java }}-clj-
       - name: Run tests
         run: clojure -M:test
+      - name: Lint
+        run: clojure -M:lint

@@ -1,39 +1,40 @@
 (ns chobo.views-test
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string :as str]
             [shitsuke.hiccup :as hic]
             [chobo.views :as views]
             [chobo.ssr :as ssr]))
 
 (deftest tenant-badge-renders-test
   (let [html (hic/->html (views/tenant-badge {:name "gftd." :operator-level :certified}))]
-    (is (clojure.string/includes? html "gftd."))
-    (is (clojure.string/includes? html "certified"))))
+    (is (str/includes? html "gftd."))
+    (is (str/includes? html "certified"))))
 
 (deftest meter-gauge-renders-test
   (let [html (hic/->html (views/meter-gauge
                           {:quotas {:image-gen 200}}
                           {:consumed {:image-gen 210}}
                           :image-gen))]
-    (is (clojure.string/includes? html "image-gen"))
-    (is (clojure.string/includes? html "210"))
-    (is (clojure.string/includes? html "200"))
-    (is (clojure.string/includes? html "OVER"))))
+    (is (str/includes? html "image-gen"))
+    (is (str/includes? html "210"))
+    (is (str/includes? html "200"))
+    (is (str/includes? html "OVER"))))
 
 (deftest invoice-card-renders-test
   (let [html (hic/->html (views/invoice-card
                           {:id "inv_1" :lines [{:description "Pro" :amount 2900 :currency "JPY"}]
                            :status :issued}))]
-    (is (clojure.string/includes? html "inv_1"))
-    (is (clojure.string/includes? html "Pro"))
-    (is (clojure.string/includes? html "2900"))
-    (is (clojure.string/includes? html "issued"))))
+    (is (str/includes? html "inv_1"))
+    (is (str/includes? html "Pro"))
+    (is (str/includes? html "2900"))
+    (is (str/includes? html "issued"))))
 
 (deftest ssr-root-html-stable-test
   (let [html (ssr/root-html)]
-    (is (clojure.string/starts-with? html "<!doctype html>"))
-    (is (clojure.string/includes? html "Pro"))           ; plan name
-    (is (clojure.string/includes? html "OVER"))           ; meter over
-    (is (clojure.string/includes? html "Audit ledger"))))
+    (is (str/starts-with? html "<!doctype html>"))
+    (is (str/includes? html "Pro"))           ; plan name
+    (is (str/includes? html "OVER"))           ; meter over
+    (is (str/includes? html "Audit ledger"))))
 
 (deftest ssr-parity-test
   (is (= (hic/->html (views/root (ssr/sample-db)))

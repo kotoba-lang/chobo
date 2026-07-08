@@ -202,10 +202,13 @@
   (if (dunning? inv now)
     ;; rough: difference in the day-of-month portion (v1 stub)
     (let [due (subs (str (:due-at inv)) 8 10)
-          now-day (subs (str now) 8 10)]
+          now-day (subs (str now) 8 10)
+          parse-int #?(:clj (fn [s] (Integer/parseInt s))
+                       :cljs (fn [s] (let [n (js/parseInt s 10)]
+                                       (if (js/isNaN n) (throw (js/Error. "NaN")) n))))]
       (try
-        (max 0 (- (Integer/parseInt now-day) (Integer/parseInt due)))
-        (catch Exception _ 1)))
+        (max 0 (- (parse-int now-day) (parse-int due)))
+        (catch #?(:clj Exception :cljs js/Error) _ 1)))
     0))
 
 (defn dunning-tier
