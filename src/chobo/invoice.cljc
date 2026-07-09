@@ -193,21 +193,42 @@
    {:tier :final      :days-overdue 30  :label "Final notice before collection"}
    {:tier :collection :days-overdue 60  :label "Sent to collections"}])
 
+(defn- civil-day-number
+  "Proleptic-Gregorian day number (days since 1970-01-01) for calendar
+  y/m/d. Howard Hinnant's days_from_civil algorithm (public domain) -- pure
+  integer arithmetic, correct across month/year/leap-year boundaries, no
+  host date library needed (portable .cljc)."
+  [y m d]
+  (let [y   (if (<= m 2) (dec y) y)
+        era (quot (if (>= y 0) y (- y 399)) 400)
+        yoe (- y (* era 400))
+        doy (+ (quot (+ (* 153 (+ m (if (> m 2) -3 9))) 2) 5) (dec d))
+        doe (+ (* yoe 365) (quot yoe 4) (- (quot yoe 100)) doy)]
+    (+ (* era 146097) doe -719468)))
+
 (defn days-overdue
-  "Compute how many days an invoice is past due. v1 stub: compares ISO date
-  strings lexicographically and returns a rough day count based on string
-  difference (not calendar-accurate; host app supplies real day count). Returns
-  0 if not overdue or no due-at."
+  "Compute how many calendar days an invoice is past due (0 if not overdue
+  or no due-at). Parses the YYYY-MM-DD prefix of both dates and diffs their
+  civil-day-numbers, so it stays correct across month/year boundaries.
+  (v1 was a day-of-month-only subtraction that silently went negative ->
+  clamped to 0 whenever `now`'s day-of-month was <= due-at's, e.g. ANY
+  overdue span crossing a month boundary -- even though dunning? had
+  already confirmed, via a separate full lexicographic ISO-date comparison,
+  that the invoice really is overdue. That silently suppressed dunning-tier
+  escalation for such invoices.)"
   [inv now]
   (if (dunning? inv now)
-    ;; rough: difference in the day-of-month portion (v1 stub)
-    (let [due (subs (str (:due-at inv)) 8 10)
-          now-day (subs (str now) 8 10)
-          parse-int #?(:clj (fn [s] (Integer/parseInt s))
+    (let [parse-int #?(:clj (fn [s] (Integer/parseInt s))
                        :cljs (fn [s] (let [n (js/parseInt s 10)]
-                                       (if (js/isNaN n) (throw (js/Error. "NaN")) n))))]
+                                       (if (js/isNaN n) (throw (js/Error. "NaN")) n))))
+          parse-ymd (fn [s] (let [s (str s)]
+                              [(parse-int (subs s 0 4))
+                               (parse-int (subs s 5 7))
+                               (parse-int (subs s 8 10))]))]
       (try
-        (max 0 (- (parse-int now-day) (parse-int due)))
+        (let [[dy dm dd] (parse-ymd (:due-at inv))
+              [ny nm nd] (parse-ymd now)]
+          (max 0 (- (civil-day-number ny nm nd) (civil-day-number dy dm dd))))
         (catch #?(:clj Exception :cljs js/Error) _ 1)))
     0))
 
