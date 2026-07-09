@@ -6,8 +6,16 @@
 (deftest line-with-tax-test
   (let [l (inv/line "Pro subscription" 2900 "JPY")
         taxed (inv/line-with-tax l 0.08)]
-    (is (= 232 (:tax taxed)))                  ; 2900 * 0.08 = 232.0 → long 232
+    (is (= 232 (:tax taxed)))                  ; 2900 * 0.08 = 232.0 exact
     (is (= 3132 (:total-with-tax taxed)))))    ; 2900 + 232
+
+(deftest line-with-tax-rounds-fractional-tax-test
+  ;; :tax must be rounded to nearest, not truncated -- 999 * 0.08 = 79.92,
+  ;; which truncates to 79 but must round to 80 per the docstring's contract.
+  (let [l (inv/line "Consulting" 999 "JPY")
+        taxed (inv/line-with-tax l 0.08)]
+    (is (= 80 (:tax taxed)))
+    (is (= 1079 (:total-with-tax taxed)))))
 
 (deftest apply-tax-test
   (let [inv' (-> (inv/invoice "gftd")
