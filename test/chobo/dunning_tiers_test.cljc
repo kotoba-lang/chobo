@@ -3,8 +3,9 @@
   (:require [clojure.test :refer [deftest is testing]]
             [chobo.invoice :as inv]))
 
-;; The days-overdue v1 stub extracts day-of-month from ISO date strings.
-;; Tests use dates within the same month to keep the stub accurate.
+;; days-overdue now diffs true civil-day-numbers (Howard Hinnant's
+;; days_from_civil), so it's correct across month/year/leap-year boundaries
+;; -- these tests are no longer restricted to same-month dates.
 
 (deftest dunning-tier-reminder-test
   ;; due 2026-06-27, now 2026-06-30 → 3 days overdue → reminder (≥1)
@@ -32,3 +33,25 @@
     (is (= :dunning-escalation (:kind a)))
     (is (= "gftd" (:tenant a)))
     (is (= :urgent (get-in a [:props :tier])))))
+
+(deftest dunning-tier-crosses-a-month-boundary
+  (testing "an overdue span crossing a month boundary must still escalate
+            correctly -- regression for a v1 stub that diffed ONLY the
+            day-of-month substring, silently going negative -> clamped to
+            0 (and dunning-tier -> nil) whenever `now`'s day-of-month was
+            <= due-at's day-of-month, even though dunning? had already
+            (correctly, via full lexicographic ISO-date comparison)
+            confirmed the invoice really is overdue"
+    (let [inv (-> (inv/invoice "gftd") (inv/add-line (inv/line "Sub" 3000))
+                  (inv/mark-issued) (assoc :due-at "2026-06-25"))]
+      ;; due 2026-06-25, now 2026-07-02 -> 7 real calendar days overdue.
+      ;; day-of-month-only diff would be 02 - 25 = -23 -> clamped to 0.
+      (is (= 7 (inv/days-overdue inv "2026-07-02")))
+      (is (= :urgent (:tier (inv/dunning-tier inv "2026-07-02")))))))
+
+(deftest dunning-tier-crosses-a-year-boundary
+  (testing "an overdue span crossing a year boundary is also unaffected"
+    (let [inv (-> (inv/invoice "gftd") (inv/add-line (inv/line "Sub" 3000))
+                  (inv/mark-issued) (assoc :due-at "2025-12-20"))]
+      (is (= 26 (inv/days-overdue inv "2026-01-15")))
+      (is (= :urgent (:tier (inv/dunning-tier inv "2026-01-15")))))))
