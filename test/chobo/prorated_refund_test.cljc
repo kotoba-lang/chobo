@@ -31,6 +31,24 @@
     (is (= (long (* 2900 (/ 4 7))) (:amount r)))
     (is (= 4 (:remaining-days r)))))
 
+(deftest prorated-refund-clamps-negative-used-days-test
+  ;; A subscription cancelled before its cycle even starts (e.g. a :pending
+  ;; sub cancelled early) can yield a negative used-days. The refund must
+  ;; not exceed the plan price -- remaining-days must clamp to cycle-days,
+  ;; not just floor at 0.
+  (let [r (sub/prorated-refund plan 30 -10 "JPY")]
+    (is (= 2900 (:amount r)) "refund capped at plan price, not inflated")
+    (is (= 30 (:remaining-days r))))
+  (let [r (sub/prorated-refund plan 30 -90 "JPY")]
+    (is (= 2900 (:amount r)) "large negative used-days still caps at plan price")
+    (is (= 30 (:remaining-days r)))))
+
+(deftest prorated-cancel-from-pending-with-negative-used-days-test
+  (let [pending-sub (sub/subscription {:id "sub_2" :tenant "gftd" :plan-id :pro})
+        result (sub/prorated-cancel pending-sub plan 30 -90)]
+    (is (= :cancelled (:status (:subscription result))))
+    (is (= 2900 (:amount (:refund result))))))
+
 (deftest prorated-cancel-test
   (let [result (sub/prorated-cancel active-sub plan 15)]
     (is (:subscription result))
