@@ -36,3 +36,16 @@
     (is (:id stored))
     (is (= (:id stored) (:id (l/get-activity s (:id stored)))))
     (is (= 1 (count (l/list-activities s))))))
+
+(deftest list-effects-excludes-decisions-test
+  ;; Decision and Effect both carry an :activity field (linking them to the
+  ;; activity they're about) -- list-effects must not mistake a Decision for
+  ;; an Effect just because it has that key too.
+  (let [s (l/mock-ledger-store)
+        stored-act (l/put-record! s act)
+        _dec (l/put-record! s (l/decision {:activity (:id stored-act) :policy :refund-policy
+                                           :status :approved :decider "alice"}))
+        stored-eff (l/put-record! s (l/effect {:activity (:id stored-act) :kind :payment :risk :high}))]
+    (is (= 1 (count (l/list-effects s))))
+    (is (= (:id stored-eff) (:id (first (l/list-effects s)))))
+    (is (= 1 (count (l/list-activities s))) "the decision must not leak into list-activities either")))
