@@ -50,7 +50,7 @@
 (defn activity [m]
   (merge {:state :open} (select-keys m [:id :lane :kind :title :source :source-id
                                         :repo :tenant :actor :artifacts :parent
-                                        :created-at :due-at]) m))
+                                        :created-at :due-at]) m {:record-type :activity}))
 
 (defn can-transition? [from to] (contains? (get activity-transitions from #{}) to))
 
@@ -70,7 +70,12 @@
    :applied #{} :rejected #{}})
 
 (defn effect [m]
-  (merge {:status :proposed :risk :low} (select-keys m [:id :activity :kind :tool :payload :repo]) m))
+  (merge {:status :proposed :risk :low} (select-keys m [:id :activity :kind :tool :payload :repo]) m
+         {:record-type :effect}))
+
+(defn decision [m]
+  (merge (select-keys m [:id :activity :policy :status :decider :decided-at :note]) m
+         {:record-type :decision}))
 
 (defn can-approve-effect? [e] (contains? #{:proposed :approved} (:status e :proposed)))
 (defn approve-effect [e] (when (= (:status e :proposed) :proposed) (assoc e :status :approved)))
@@ -98,6 +103,12 @@
   (list-activities [this] "All activities, newest-first where applicable.")
   (list-effects [this]))
 
+;; Records built via `activity`/`effect`/`decision` all carry an explicit
+;; :record-type -- Decision and Effect both have an :activity field (linking
+;; them to the activity they're about), so discriminating list-effects by
+;; "has an :activity key" would also match Decisions; discriminate by the
+;; explicit tag instead.
+
 (defrecord MockLedgerStore [state]
   ILedgerStore
   (put-record! [_ r]
@@ -105,8 +116,8 @@
       (swap! state update :records conj r)
       r))
   (get-activity [s id]
-    (some #(when (and (:lane %) (= (:id %) id)) %) (:records @state)))
-  (list-activities [_] (filterv :lane (:records @state)))
-  (list-effects [_] (filterv :activity (:records @state))))
+    (some #(when (and (= :activity (:record-type %)) (= (:id %) id)) %) (:records @state)))
+  (list-activities [_] (filterv #(= :activity (:record-type %)) (:records @state)))
+  (list-effects [_] (filterv #(= :effect (:record-type %)) (:records @state))))
 
 (defn mock-ledger-store [] (->MockLedgerStore (atom {:records []})))
