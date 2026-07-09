@@ -47,7 +47,8 @@
   amount + tax."
   [line rate]
   (let [amt (:amount line 0)
-        tax (long (* amt rate))]
+        tax #?(:clj (Math/round (double (* amt rate)))
+               :cljs (js/Math.round (* amt rate)))]
     (assoc line :tax tax :total-with-tax (+ amt tax))))
 
 (defn apply-tax
