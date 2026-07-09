@@ -159,8 +159,12 @@
    (prorated-refund plan cycle-days used-days currency nil))
   ([plan cycle-days used-days currency opts]
    (let [price (:price plan 0)
-         remaining (max 0 (- (or cycle-days 30) (or used-days 0)))
          cycle (max 1 (or cycle-days 30))      ; avoid div-by-zero
+         ;; clamp to [0, cycle] on both ends -- a negative used-days (e.g. a
+         ;; :pending subscription cancelled before its cycle even starts)
+         ;; must not push remaining past cycle and inflate the refund above
+         ;; the plan price.
+         remaining (min cycle (max 0 (- (or cycle-days 30) (or used-days 0))))
          refund (* price (/ remaining cycle))]
      {:amount (long refund)
       :currency (or currency "JPY")
