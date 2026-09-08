@@ -1,6 +1,6 @@
 (ns chobo.views-test
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [shitsuke.hiccup :as hic]
             [chobo.views :as views]
             [chobo.ssr :as ssr]))
