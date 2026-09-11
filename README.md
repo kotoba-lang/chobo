@@ -40,8 +40,8 @@ chobo = ledger (EAVT) + subscription (plan/entitlement/quota/metering/overage)
 ## Tests
 
 ```bash
-clojure -M:test            # published git shitsuke dep
-clojure -M:local:test      # local ../shitsuke override
+kbb -M:test            # published git shitsuke dep
+kbb -M:local:test      # local ../shitsuke override
 ```
 
 ## Design
