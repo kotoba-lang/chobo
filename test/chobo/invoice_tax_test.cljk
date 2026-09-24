@@ -1,6 +1,6 @@
 (ns chobo.invoice-tax-test
   "Invoice tax breakdown: line-with-tax, apply-tax, tax-summary."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.invoice :as inv]))
 
 (deftest line-with-tax-test

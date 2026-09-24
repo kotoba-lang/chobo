@@ -1,6 +1,6 @@
 (ns chobo.partial-payment-test
   "Partial payments + credit balance."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.invoice :as inv]))
 
 (defn issued-inv
