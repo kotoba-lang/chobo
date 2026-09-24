@@ -1,6 +1,6 @@
 (ns chobo.tenant-roles-test
   "Role/capability inheritance model."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.tenant :as tenant]))
 
 (deftest role-inherits-test

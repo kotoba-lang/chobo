@@ -1,6 +1,6 @@
 (ns chobo.prorated-refund-test
   "Prorated refund on subscription cancellation."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.subscription :as sub]))
 
 (def plan (sub/plan {:id :pro :name "Pro" :price 2900 :currency "JPY"}))

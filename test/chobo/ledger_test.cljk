@@ -1,5 +1,5 @@
 (ns chobo.ledger-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.ledger :as l]))
 
 (def act (l/activity {:lane :billing :kind :invoice :title "inv 1" :tenant "gftd"}))

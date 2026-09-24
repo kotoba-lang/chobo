@@ -1,7 +1,7 @@
 (ns chobo.effect-lifecycle-test
   "Effect lifecycle round-trip: proposed → approved → applied (or rejected),
   appended to ledger, queryable."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.ledger :as l]))
 
 (deftest effect-approve-apply-roundtrip-test

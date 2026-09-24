@@ -1,6 +1,6 @@
 (ns chobo.dunning-tiers-test
   "Dunning escalation tiers: reminder → urgent → final → collection."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.invoice :as inv]))
 
 ;; days-overdue now diffs true civil-day-numbers (Howard Hinnant's

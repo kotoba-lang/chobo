@@ -1,5 +1,5 @@
 (ns chobo.subscription-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.subscription :as sub]))
 
 (deftest entitlement-test

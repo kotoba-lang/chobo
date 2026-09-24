@@ -1,7 +1,7 @@
 (ns chobo.subscription-lifecycle-test
   "Subscription lifecycle (activate/suspend/cancel/reactivate) + metering
   window reset."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [chobo.subscription :as sub]))
 
 (def s (sub/subscription {:id "sub_1" :tenant "gftd" :plan-id :pro}))
