@@ -8,7 +8,7 @@
   :contributor → :self-host → :certified → :managed → :core."
 
   (:refer-clojure :exclude [tenant])
-  (:require [clojure.set :as set]))
+  (:require [kotoba.lang.coll :as set]))
 
 (def operator-levels
   [:contributor :self-host :certified :managed :core])
